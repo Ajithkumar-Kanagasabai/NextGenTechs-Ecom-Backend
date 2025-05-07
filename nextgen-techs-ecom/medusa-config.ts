@@ -1,6 +1,8 @@
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
+import dotenv from "dotenv"
+dotenv.config()
 
 module.exports = defineConfig({
   projectConfig: {
@@ -12,5 +14,28 @@ module.exports = defineConfig({
       jwtSecret: process.env.JWT_SECRET || "supersecret",
       cookieSecret: process.env.COOKIE_SECRET || "supersecret",
     }
-  }
+  },
+  modules: {
+    file: {
+      resolve: "@medusajs/medusa/file",
+      options: {
+        providers: [
+          {
+            resolve: "./src/modules/my-s3-file",
+            id: "my-s3",
+            options: {
+              access_key_id: process.env.AWS_ACCESS_KEY,
+              secret_access_key: process.env.AWS_SECRET_ACCESS,
+              region: process.env.AWS_S3_REGION,
+              bucket: process.env.AWS_S3_BUCKET_NAME,
+              endpoint: process.env.AWS_S3_ENDPOINT || undefined, // optional
+            },
+          },
+        ],
+      },
+    },
+    product_review: {
+      resolve: "./src/modules/product_review",
+    },
+  },
 })
