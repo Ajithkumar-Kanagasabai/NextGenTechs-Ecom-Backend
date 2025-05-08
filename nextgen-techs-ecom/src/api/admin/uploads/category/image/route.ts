@@ -44,7 +44,6 @@ import {
         Key: fileKey,
         Body: file.buffer,
         ContentType: file.mimetype,
-        ACL: "public-read",
       },
     })
   

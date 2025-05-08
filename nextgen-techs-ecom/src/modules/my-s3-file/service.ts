@@ -11,14 +11,12 @@ type S3ProviderOptions = {
   access_key_id: string
   secret_access_key: string
   region: string
-  endpoint?: string
   bucket: string
 }
 
 class S3FileProviderService extends AbstractFileProviderService {
   protected s3Client: S3Client
   protected bucket: string
-  protected endpoint?: string
   protected region: string
 
   static identifier = "s3"
@@ -27,17 +25,14 @@ class S3FileProviderService extends AbstractFileProviderService {
     super()
 
     this.s3Client = new S3Client({
-      region: options.region,
-      endpoint: options.endpoint,
+      region: process.env.AWS_S3_REGION, // Make sure the region is set correctly
       credentials: {
         accessKeyId: options.access_key_id,
         secretAccessKey: options.secret_access_key,
       },
-      forcePathStyle: !!options.endpoint, // Required for MinIO or custom endpoints
-    })
-
+      forcePathStyle: false, 
+    })    
     this.bucket = options.bucket
-    this.endpoint = options.endpoint
     this.region = options.region
   }
 
@@ -55,18 +50,13 @@ class S3FileProviderService extends AbstractFileProviderService {
         Key: fileKey,
         Body: Buffer.from(file.content, "binary"),
         ContentType: file.mimeType,
-        ACL: "public-read",
       },
     })
 
     const result = await upload.done()
 
-    // If AWS didn't provide a location, construct a public URL manually
-    const fallbackBaseUrl = this.endpoint
-      ? `${this.endpoint.replace(/\/$/, "")}/${this.bucket}`
-      : `https://${this.bucket}.s3.${this.region}.amazonaws.com`
-
-    const url = (result as any).Location || `${fallbackBaseUrl}/${fileKey}`
+    const url = (result as any).Location ||
+      `https://${this.bucket}.s3.${this.region}.amazonaws.com/${fileKey}`
 
     return {
       url,
