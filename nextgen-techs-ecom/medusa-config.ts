@@ -36,5 +36,8 @@ module.exports = defineConfig({
     product_review: {
       resolve: "./src/modules/product_review",
     },
+     product_banner: {
+      resolve: "./src/modules/product_banner",
+    },
   },
 })
