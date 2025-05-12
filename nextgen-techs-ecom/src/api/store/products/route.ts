@@ -17,26 +17,22 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     category_id,
     collection_id,
     fields,
+    order,
     ...otherFilters
   } = req.query;
 
   try {
     let region: RegionDTO | null = null;
 
-    // Resolve region if region_id is provided
     if (typeof region_id === "string") {
       try {
-        const regions = await regionService.listRegions(
-          { id: [region_id] },
-          {}
-        );
+        const regions = await regionService.listRegions({ id: [region_id] }, {});
         region = regions?.[0] ?? null;
       } catch (err) {
         console.warn("Region not found:", region_id);
       }
     }
 
-    // Normalize helper
     const normalizeToStringArray = (
       value: string | ParsedQs | (string | ParsedQs)[]
     ): string[] => {
@@ -79,6 +75,14 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
     const currency_code = region?.currency_code || "gbp";
 
+    // Optional: Parse order string like "-created_at" into object format if needed
+    const parsedOrder =
+      typeof order === "string"
+        ? {
+            [order.replace(/^-/, "")]: order.startsWith("-") ? "DESC" : "ASC",
+          }
+        : undefined;
+
     const productQuery = {
       entity: "product",
       fields: [
@@ -92,6 +96,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         "categories.*",
       ],
       filters,
+      order: parsedOrder,
       context: {
         variants: {
           calculated_price: QueryContext({ currency_code }),
@@ -101,7 +106,6 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
     const { data: products } = await query.graph(productQuery);
 
-    // Fetch reviews and attach to products
     const productIds = products.map((p) => p.id);
     const reviewStats = await reviewService.getReviewStatsByProductIds(
       productIds

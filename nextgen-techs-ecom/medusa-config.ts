@@ -33,11 +33,27 @@ module.exports = defineConfig({
         ],
       },
     },
+    //  "google-apple-auth": {
+    //   resolve: "./src/modules/auth",
+    // },
     product_review: {
       resolve: "./src/modules/product_review",
     },
      product_banner: {
       resolve: "./src/modules/product_banner",
     },
+    special_offers_banner: {
+      resolve: "./src/modules/special_offers_banner",
+    },
+     category_banner: {
+      resolve: "./src/modules/category_banner",
+    },
+     sendgrid: {
+      resolve: "./src/services/sendGrid.ts",
+      options: {
+        api_key: process.env.SENDGRID_API_KEY,
+        from_email: process.env.SENDGRID_FROM_EMAIL,
+      },
+    } 
   },
 })

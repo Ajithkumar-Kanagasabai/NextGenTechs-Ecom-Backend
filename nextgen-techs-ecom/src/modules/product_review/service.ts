@@ -153,6 +153,60 @@ class ProductReviewModuleService extends MedusaService({
 
     return result;
   }
+
+ async fetchALLReviewsData(productIds: string[], offset: number, limit: number) {
+ 
+  const totalCountPerProduct: Record<string, number> = {};
+
+  // Fetch total review count per product
+  for (const productId of productIds) {
+    const [, count] = await this.listAndCountProductReviews({
+      product_id: productId,
+    });
+    totalCountPerProduct[productId] = count;
+  }
+
+  // Fetch all reviews for the product IDs
+  const filterOptions: any = {
+    product_id: productIds,
+  };
+
+  const [totalReviewData] = await this.listAndCountProductReviews(filterOptions, {});
+
+  if (!totalReviewData.length) {
+    return productIds.map((product_id) => ({
+      totalRatings: 0,
+      averageRating: 0,
+      totalComments: 0,
+      product_id,
+    }));
+  }
+
+  return productIds.map((product_id) => {
+    const productReviews = totalReviewData.filter(
+      (review) => review.product_id === product_id
+    );
+
+    const validReviews = productReviews.filter(
+      (review) => review.rating !== null && review.rating !== undefined
+    );
+
+    const totalRatings = validReviews.length;
+    const totalComments = productReviews.length;
+    const averageRating =
+      totalRatings > 0
+        ? validReviews.reduce((sum, r) => sum + r.rating, 0) / totalRatings
+        : 0;
+
+    return {
+      product_id,
+      totalRatings,
+      averageRating,
+      totalComments,
+    };
+  });
+}
+
 }
 
 export default ProductReviewModuleService;
