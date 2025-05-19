@@ -54,6 +54,9 @@ module.exports = defineConfig({
         api_key: process.env.SENDGRID_API_KEY,
         from_email: process.env.SENDGRID_FROM_EMAIL,
       },
-    } 
+    },
+    wishlist: {
+      resolve: "./src/modules/wishlist",
+    }, 
   },
 })

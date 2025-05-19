@@ -1,12 +1,13 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http";
 import ProductReviewModuleService from "../../../modules/product_review/service";
 import { Modules, QueryContext } from "@medusajs/framework/utils";
 import { RegionDTO } from "@medusajs/framework/types";
 import { ParsedQs } from "qs";
+import WishlistModuleService from "../../../modules/wishlist/service";
 
-export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-  const reviewService =
-    req.scope.resolve<ProductReviewModuleService>("product_review");
+export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) => {
+  const reviewService = req.scope.resolve<ProductReviewModuleService>("product_review");
+  const wishlistService = req.scope.resolve("wishlist") as WishlistModuleService;
   const query = req.scope.resolve("query");
   const regionService = req.scope.resolve(Modules.REGION);
 
@@ -22,6 +23,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   } = req.query;
 
   try {
+    const customer_id = req.auth_context?.actor_id;
     let region: RegionDTO | null = null;
 
     if (typeof region_id === "string") {
@@ -75,7 +77,6 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
     const currency_code = region?.currency_code || "gbp";
 
-    // Optional: Parse order string like "-created_at" into object format if needed
     const parsedOrder =
       typeof order === "string"
         ? {
@@ -105,22 +106,51 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     };
 
     const { data: products } = await query.graph(productQuery);
-
     const productIds = products.map((p) => p.id);
-    const reviewStats = await reviewService.getReviewStatsByProductIds(
-      productIds
-    );
 
+    // Fetch review stats
+    const reviewStats = await reviewService.getReviewStatsByProductIds(productIds);
+
+    // Fetch wishlist items if customer is authenticated
+    let wishlistMap: Record<
+      string,
+      { wishlist_item_id: string | null; is_in_wishlist: boolean }
+    > = {};
+
+    if (customer_id) {
+      const wishlists = await wishlistService.listWishlists({ customer_id });
+
+      const customerWishlist = wishlists.find(w => w.customer_id === customer_id);
+      if (customerWishlist) {
+        const wishlist = await wishlistService.retrieveWishlist(customerWishlist.id, {
+          relations: ["items"],
+        });
+
+        for (const item of wishlist.items) {
+          wishlistMap[item.product_id] = {
+            is_in_wishlist: true,
+            wishlist_item_id: item.id,
+          };
+        }
+      }
+    }
+
+    // Enrich products with reviews and wishlist flags
     const enrichedProducts = products.map((product) => {
       const stats = reviewStats[product.id] || {
         user_total_reviews: 0,
         avg_rating: 0,
       };
 
+      const wishlistEntry = wishlistMap[product.id] || {
+        is_in_wishlist: false,
+        wishlist_item_id: null,
+      };
+
       return {
         ...product,
-        user_total_reviews: stats.user_total_reviews,
-        avg_rating: stats.avg_rating,
+        ...stats,
+        ...wishlistEntry,
       };
     });
 
