@@ -1,6 +1,13 @@
-import { MedusaRequest, MedusaResponse } from "@medusajs/framework/http";
-import { ContainerRegistrationKeys, QueryContext } from "@medusajs/framework/utils";
+import {
+  AuthenticatedMedusaRequest,
+  MedusaResponse,
+} from "@medusajs/framework/http";
+import {
+  ContainerRegistrationKeys,
+  QueryContext,
+} from "@medusajs/framework/utils";
 import ProductBannerModuleService from "../../../../modules/product_review/service";
+import WishlistModuleService from "../../../../modules/wishlist/service";
 
 // Custom variant and product interfaces
 interface CustomVariant {
@@ -21,16 +28,26 @@ interface CustomProduct {
   [key: string]: any;
 }
 
-export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
+export const GET = async (
+  req: AuthenticatedMedusaRequest,
+  res: MedusaResponse
+) => {
   try {
     const query = req.scope.resolve(ContainerRegistrationKeys.QUERY);
-    const reviewModuleService: ProductBannerModuleService = req.scope.resolve("product_review");
+    const reviewModuleService: ProductBannerModuleService =
+      req.scope.resolve("product_review");
+    const wishlistService = req.scope.resolve(
+      "wishlist"
+    ) as WishlistModuleService;
+    const customer_id = req.auth_context?.actor_id;
 
     const region_id = req.query.region_id as string;
     const sort = req.query.sort as string;
     const limit = req.query.limit as string;
     const offset = req.query.offset as string;
-    const minRating = req.query.rating ? parseFloat(req.query.rating as string) : undefined;
+    const minRating = req.query.rating
+      ? parseFloat(req.query.rating as string)
+      : undefined;
 
     const parsedLimit = parseInt(limit, 10) || 10;
     const parsedOffset = parseInt(offset, 10) || 0;
@@ -75,6 +92,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         "variants.calculated_price.*",
         "collection.*",
         "categories.*",
+        "tags.*",
       ],
       filters,
       pagination: {
@@ -105,6 +123,58 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       });
     });
 
+    const productIds = products.map((p) => p.id);
+
+    // Fetch wishlist items if customer is authenticated
+    let wishlistMap: Record<
+      string,
+      { wishlist_item_id: string | null; is_in_wishlist: boolean }
+    > = {};
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+
+    // Get all wishlist items for the target products in the last 30 days
+    const recentWishlistItems = await wishlistService.listWishlistItems({
+      product_id: productIds,
+      created_at: {
+        $gte: thirtyDaysAgo.toISOString(),
+        $lte: now.toISOString(),
+      },
+    });
+
+    // Map to store product_id into wishlist count
+    const wishlistCountMap: Record<string, number> = {};
+
+    for (const item of recentWishlistItems) {
+      wishlistCountMap[item.product_id] =
+        (wishlistCountMap[item.product_id] || 0) + 1;
+    }
+
+    if (customer_id) {
+      const wishlists = await wishlistService.listWishlists({ customer_id });
+
+      const customerWishlist = wishlists.find(
+        (w) => w.customer_id === customer_id
+      );
+      if (customerWishlist) {
+        const wishlist = await wishlistService.retrieveWishlist(
+          customerWishlist.id,
+          {
+            relations: ["items"],
+          }
+        );
+
+        for (const item of wishlist.items) {
+          wishlistMap[item.product_id] = {
+            is_in_wishlist: true,
+            wishlist_item_id: item.id,
+          };
+        }
+      }
+    }
+
     // Sort variants and products if sort is provided
     if (sort === "asc" || sort === "desc") {
       products.forEach((product) => {
@@ -124,7 +194,6 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
     // Add ratings if filtering by rating
     let enrichedProducts = products;
-    const productIds = products.map((p) => p.id);
 
     if (minRating !== undefined) {
       const reviewStats = await reviewModuleService.fetchALLReviewsData(
@@ -136,16 +205,23 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       enrichedProducts = products
         .map((product) => {
           const stats = reviewStats.find((r) => r.product_id === product.id);
+          const wishlistEntry = wishlistMap[product.id] || {
+            is_in_wishlist: false,
+            wishlist_item_id: null,
+          };
+
           return {
             ...product,
             ratings: {
-              totalRatings: stats?.totalRatings || 0,
-              averageRating: stats?.averageRating || 0,
-              totalComments: stats?.totalComments || 0,
+              user_total_ratings: stats?.user_total_ratings || 0,
+              avg_rating: stats?.avg_rating || 0,
+              total_comments: stats?.total_comments || 0,
             },
+            ...wishlistEntry,
+            wishlists_total: wishlistCountMap[product.id] || 0,
           };
         })
-        .filter((p) => p.ratings.averageRating >= minRating);
+        .filter((p) => p.ratings.avg_rating >= minRating);
     }
 
     res.json({
@@ -156,6 +232,8 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     });
   } catch (error: any) {
     console.error("Error fetching products:", error);
-    res.status(500).json({ error: "Internal Server Error", details: error.message });
+    res
+      .status(500)
+      .json({ error: "Internal Server Error", details: error.message });
   }
 };

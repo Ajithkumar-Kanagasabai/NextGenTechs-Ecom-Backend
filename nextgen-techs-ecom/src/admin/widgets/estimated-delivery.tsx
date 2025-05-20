@@ -95,7 +95,7 @@ const EstimatedDeliveryWidget = () => {
 }
 
 export const config = defineWidgetConfig({
-  zone: "product.details.before",
+  zone: "product.details.side.before",
 })
 
 export default EstimatedDeliveryWidget

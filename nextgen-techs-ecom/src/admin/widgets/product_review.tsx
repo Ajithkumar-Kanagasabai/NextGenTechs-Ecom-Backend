@@ -7,9 +7,9 @@ import { Badge } from "@medusajs/ui";
 import { useNavigate } from "react-router";
 
 type ReviewTypes = {
-  totalRatings: number;
-  averageRating: number;
-  totalComments: number;
+  user_total_ratings: number;
+  avg_rating: number;
+  total_comments: number;
   reviews: {
     customerId: string;
     customerName: string;
@@ -29,9 +29,9 @@ const ProductWidget = () => {
   const isFetched = useRef(false); //  prevent double api calls
 
   const [productReviews, setProductReviews] = useState<ReviewTypes>({
-    totalRatings: 0,
-    averageRating: 0,
-    totalComments: 0,
+    user_total_ratings: 0,
+    avg_rating: 0,
+    total_comments: 0,
     reviews: [],
   });
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -137,9 +137,9 @@ const ProductWidget = () => {
         <div>
           <Heading level="h2" className="mt-6">
             Ratings(
-            <span className="text-sm">{productReviews.totalRatings}</span>)
+            <span className="text-sm">{productReviews.user_total_ratings}</span>)
             <div className="flex gap-x-2 mt-4 ">
-              {renderStars(productReviews.averageRating)}
+              {renderStars(productReviews.avg_rating)}
             </div>
             <button
               className="text-blue-500 hover:underline font-medium mt-2"
@@ -154,7 +154,7 @@ const ProductWidget = () => {
       {showReviews && (
         <div className="px-6 py-4">
           <Heading level="h2">
-            User Reviews({productReviews.totalComments})
+            User Reviews({productReviews.total_comments})
           </Heading>
           {productReviews.reviews.length > 0 ? (
             productReviews.reviews.map((review, index) => (

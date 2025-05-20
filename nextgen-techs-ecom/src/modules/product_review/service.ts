@@ -22,9 +22,9 @@ class ProductReviewModuleService extends MedusaService({
 
     if (!paginatedReviews.length) {
       return {
-        totalRatings: 0,
-        averageRating: 0,
-        totalComments: 0,
+        user_total_ratings: 0,
+        avg_rating: 0,
+        total_comments: 0,
         reviews: [],
         count: totalCount,
         offset,
@@ -37,9 +37,9 @@ class ProductReviewModuleService extends MedusaService({
       (r) => r.rating !== null && r.rating !== undefined
     );
 
-    const totalRatings = validReviews.length;
-    const totalComments = allReviews.length;
-    const averageRating =
+    const user_total_ratings = validReviews.length;
+    const total_comments = allReviews.length;
+    const avg_rating =
       validReviews.length > 0
         ? parseFloat(
             (
@@ -86,9 +86,9 @@ class ProductReviewModuleService extends MedusaService({
     );
 
     return {
-      totalRatings,
-      averageRating,
-      totalComments,
+      user_total_ratings,
+      avg_rating,
+      total_comments,
       reviews,
       count: totalCount,
       offset,
@@ -138,7 +138,7 @@ class ProductReviewModuleService extends MedusaService({
     // Calculate review stats
     const result = Object.entries(grouped).reduce((acc, [productId, group]) => {
       acc[productId] = {
-        user_total_reviews: group.length,
+        user_total_ratings: group.length,
         avg_rating:
           group.length > 0
             ? parseFloat(
@@ -149,7 +149,7 @@ class ProductReviewModuleService extends MedusaService({
             : 0,
       };
       return acc;
-    }, {} as Record<string, { user_total_reviews: number; avg_rating: number }>);
+    }, {} as Record<string, { user_total_ratings: number; avg_rating: number }>);
 
     return result;
   }
@@ -175,9 +175,9 @@ class ProductReviewModuleService extends MedusaService({
 
   if (!totalReviewData.length) {
     return productIds.map((product_id) => ({
-      totalRatings: 0,
-      averageRating: 0,
-      totalComments: 0,
+      user_total_ratings: 0,
+      avg_rating: 0,
+      total_comments: 0,
       product_id,
     }));
   }
@@ -191,18 +191,18 @@ class ProductReviewModuleService extends MedusaService({
       (review) => review.rating !== null && review.rating !== undefined
     );
 
-    const totalRatings = validReviews.length;
-    const totalComments = productReviews.length;
-    const averageRating =
-      totalRatings > 0
-        ? validReviews.reduce((sum, r) => sum + r.rating, 0) / totalRatings
+    const user_total_ratings = validReviews.length;
+    const total_comments = productReviews.length;
+    const avg_rating =
+      user_total_ratings > 0
+        ? validReviews.reduce((sum, r) => sum + r.rating, 0) / user_total_ratings
         : 0;
 
     return {
       product_id,
-      totalRatings,
-      averageRating,
-      totalComments,
+      user_total_ratings,
+      avg_rating,
+      total_comments,
     };
   });
 }

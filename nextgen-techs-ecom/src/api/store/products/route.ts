@@ -1,13 +1,22 @@
-import { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http";
+import {
+  AuthenticatedMedusaRequest,
+  MedusaResponse,
+} from "@medusajs/framework/http";
 import ProductReviewModuleService from "../../../modules/product_review/service";
 import { Modules, QueryContext } from "@medusajs/framework/utils";
 import { RegionDTO } from "@medusajs/framework/types";
 import { ParsedQs } from "qs";
 import WishlistModuleService from "../../../modules/wishlist/service";
 
-export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) => {
-  const reviewService = req.scope.resolve<ProductReviewModuleService>("product_review");
-  const wishlistService = req.scope.resolve("wishlist") as WishlistModuleService;
+export const GET = async (
+  req: AuthenticatedMedusaRequest,
+  res: MedusaResponse
+) => {
+  const reviewService =
+    req.scope.resolve<ProductReviewModuleService>("product_review");
+  const wishlistService = req.scope.resolve(
+    "wishlist"
+  ) as WishlistModuleService;
   const query = req.scope.resolve("query");
   const regionService = req.scope.resolve(Modules.REGION);
 
@@ -28,7 +37,10 @@ export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) 
 
     if (typeof region_id === "string") {
       try {
-        const regions = await regionService.listRegions({ id: [region_id] }, {});
+        const regions = await regionService.listRegions(
+          { id: [region_id] },
+          {}
+        );
         region = regions?.[0] ?? null;
       } catch (err) {
         console.warn("Region not found:", region_id);
@@ -109,7 +121,9 @@ export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) 
     const productIds = products.map((p) => p.id);
 
     // Fetch review stats
-    const reviewStats = await reviewService.getReviewStatsByProductIds(productIds);
+    const reviewStats = await reviewService.getReviewStatsByProductIds(
+      productIds
+    );
 
     // Fetch wishlist items if customer is authenticated
     let wishlistMap: Record<
@@ -117,14 +131,40 @@ export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) 
       { wishlist_item_id: string | null; is_in_wishlist: boolean }
     > = {};
 
+    const now = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+
+    // Get all wishlist items for the target products in the last 30 days
+    const recentWishlistItems = await wishlistService.listWishlistItems({
+      product_id: productIds,
+      created_at: {
+        $gte: thirtyDaysAgo.toISOString(),
+        $lte: now.toISOString(),
+      },
+    });
+
+    // Map to store product_id into wishlist count
+    const wishlistCountMap: Record<string, number> = {};
+
+    for (const item of recentWishlistItems) {
+      wishlistCountMap[item.product_id] =
+        (wishlistCountMap[item.product_id] || 0) + 1;
+    }
+
     if (customer_id) {
       const wishlists = await wishlistService.listWishlists({ customer_id });
 
-      const customerWishlist = wishlists.find(w => w.customer_id === customer_id);
+      const customerWishlist = wishlists.find(
+        (w) => w.customer_id === customer_id
+      );
       if (customerWishlist) {
-        const wishlist = await wishlistService.retrieveWishlist(customerWishlist.id, {
-          relations: ["items"],
-        });
+        const wishlist = await wishlistService.retrieveWishlist(
+          customerWishlist.id,
+          {
+            relations: ["items"],
+          }
+        );
 
         for (const item of wishlist.items) {
           wishlistMap[item.product_id] = {
@@ -138,7 +178,7 @@ export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) 
     // Enrich products with reviews and wishlist flags
     const enrichedProducts = products.map((product) => {
       const stats = reviewStats[product.id] || {
-        user_total_reviews: 0,
+        user_total_ratings: 0,
         avg_rating: 0,
       };
 
@@ -149,8 +189,11 @@ export const GET = async (req: AuthenticatedMedusaRequest, res: MedusaResponse) 
 
       return {
         ...product,
-        ...stats,
+        ratings: {
+          ...stats,
+        },
         ...wishlistEntry,
+        wishlists_total: wishlistCountMap[product.id] || 0,
       };
     });
 
