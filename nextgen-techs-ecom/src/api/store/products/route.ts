@@ -65,6 +65,10 @@ export const GET = async (
 
     const filters: Record<string, any> = { ...otherFilters };
 
+    if (otherFilters.handle) {
+      filters["handle"] = otherFilters.handle;
+    }
+
     const andConditions: any[] = [];
 
     if (categoryIds.length) {
@@ -100,6 +104,7 @@ export const GET = async (
       entity: "product",
       fields: [
         "*",
+         "options.*",
         "variants.*",
         "variants.options.*",
         "variants.calculated_price.*",
